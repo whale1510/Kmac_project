@@ -3,14 +3,18 @@
 #라이브러리 로드
 import os
 import json
+import shutil
 import datetime
 import pandas as pd
 
-#전처리 함수
-def json2csv(file_path_list):
-    df_list = []
 
+
+#전처리 함수
+def json2csv(folder_path):
+    df_list = []
+    file_path_list = os.listdir(folder_path)
     for file in file_path_list:
+        file = os.path.join(folder_path, str(file))
         with open(file, 'r') as f:
             data = json.load(f)
             # json 데이터를 pandas DataFrame으로 변환
@@ -23,21 +27,119 @@ def json2csv(file_path_list):
 
     return merged_df
 
+def check_and_prompt(message):
+    print(message)
+    user_input = input("Continue? (y/n): ").strip().lower()
+    if user_input != 'y':
+        print("Program stopped.")
+        raise SystemExit 
+
 def preprocessing(df):
-    pass
+    #결측치 검사
+    null_values = df.isnull().sum()
+    if null_values.any():
+        check_and_prompt("Null values in the following columns:\n" + str(null_values[null_values > 0]))
+
+    # 타입 검사
+    print("\nData types of each column:")
+    print(df.dtypes)
+
+    # 열 데이터 타입 검사
+    for column in ['x', 'y', 'z', 'user']:
+        if not pd.api.types.is_numeric_dtype(df[column]):
+            check_and_prompt(f"{column} column is not numeric. Please check the data.")
+
+    # 중복 검사
+    duplicate_rows = df.duplicated().sum()
+    if duplicate_rows > 0:
+        check_and_prompt(f"\nNumber of duplicate rows: {duplicate_rows}")
+
+    # 날짜 타입으로 변환 및 검사
+    df['time'] = pd.to_datetime(df['time'], errors='coerce')
+    if df['time'].isnull().any():
+        check_and_prompt("\nSome time values could not be converted to datetime.")
+
+    # 데이터프레임 타입 검사
+    print("\nData types after conversion:")
+    print(df.dtypes)
+
+    return df
 
 def load_userfile_info(user_folder):
-    pass
+    threshold_list = {}
+    folder_list = os.listdir(user_folder)
+    for folder_name in folder_list:
+        folder_path = os.path.join(user_folder, str(folder_name))
+        if os.path.isdir(folder_path):
+            for file_name in os.listdir(folder_path):
+                if file_name.endswith(".json") and folder_name in file_name:
+                    file_path = os.path.join(folder_path, str(file_name))
 
-def move_files(source, destinations):
-    pass
+                    # JSON 파일을 읽어 딕셔너리에 저장
+                    with open(file_path, 'r') as json_file:
+                        data = json.load(json_file)
+                        threshold_list[folder_name] = data
+
+    return folder_list, threshold_list
+
+def move_files(source, destination):
+    for filename in os.listdir(source):
+        file_path = os.path.join(source, str(filename))
+        if os.path.isfile(file_path):
+            # 파일을 이동하고 대상에 같은 이름의 파일이 있으면 덮어씁니다
+            shutil.move(file_path, os.path.join(destination, str(filename)))
+
+
 
 #이상탐지 함수
-def detection(df, threshold_list, output_path):
-    pass
+def detection(df, threshold_list, output_path, current_date):
+    normal_group = []
+    outlier_group = []
+    total_group = []
+    
+    for user, group in df.groupby('user'):
+        threshold = threshold_list.get(user)
+        total_sum = group[['x','y','z']].abs().sum().sum()
+        if total_sum < 3.0 :
+            outlier_group.append({"user_id" : f'{user}', "status" : "1"})
+            total_group.append({"user_id" : f'{user}', "status" : "1"})
+        else :
+            normal_group.append({"user_id" : f'{user}', "status" : "0"})
+            total_group.append({"user_id" : f'{user}', "status" : "0"})
 
-def append_user_history(df, user_folder, user_file_list):
-    pass
+    results = {
+        "date" : current_date,
+        "data" : total_group
+    }
+
+    filename = f"result_{current_date}.json"
+    file_path = os.path.join(output_path, filename)
+
+    # JSON 파일에 쓰기
+    with open(file_path, 'w') as json_file:
+        json.dump(results, json_file, indent=4)
+ 
+    #히스토리 추가하고, 날짜별 분류 가능하게 변경할 예정
+    
+    
+def append_to_csv(df, user_folder):
+    for user, group in df.groupby('user'):
+        user_folder_name = os.path.join(user_folder, str(user))
+        os.makedirs(user_folder_name, exist_ok=True)
+
+        user_file = os.path.join(user_folder_name, f'{user}.csv')
+        # 파일이 없다면 생성, 있다면 데이터를 덧붙임
+        if not os.path.exists(user_file):
+            group.to_csv(user_file, index=False)
+        else:
+            group.to_csv(user_file, mode='a', header=False, index=False)
+            group = pd.read_csv(user_file)
+            # 'date' 변수 기준으로 데이터 정렬
+            group = group.sort_values(by='time')
+            group = group.drop_duplicates()
+            group.to_csv(user_file, index=False)
+
+
 
 if __name__ == "__main__":
     ## 변수 및 path 준비과정
@@ -49,11 +151,11 @@ if __name__ == "__main__":
     base_path = os.getcwd()
 
     config_file_path = "test_config.json"
-    with open('Test/' + config_file_path, "r", encoding="utf-8") as config_file:
+    with open(config_file_path, "r", encoding="utf-8") as config_file:
         config = json.load(config_file)
 
-    # 각 폴더의 파일 리스트를 가져옵니다.
-    Gyro_train_folder = os.listdir(config['input_json_file_path']["Gyro_test_data"])  
+    # 폴더 위치를 가져옵니다.
+    Gyro_train_folder_path = config['input_json_file_path']["Gyro_test_data"] 
 
     #통합 데이터 1차 저장경로
     total_filename = "Test_Total.csv"
@@ -65,16 +167,18 @@ if __name__ == "__main__":
     #결과 저장 경로
     output_path = config['output_path']['output_result']
 
+    """
     #파일 이동 경로
     test_data_source = config['device_meter_folder_path']['device_test_path']
     train_data_destination =  config['device_meter_folder_path']['meter_train_path']
+    """
 
 
     ##전처리 과정
     #날짜별로 통합(데이터셋에 따라 맞춰서 구축)
     pass
 
-    merged_df = json2csv(Gyro_train_folder)
+    merged_df = json2csv(Gyro_train_folder_path)
 
     #통합 데이터 전처리
     total_df = preprocessing(merged_df)
@@ -82,15 +186,19 @@ if __name__ == "__main__":
     #통합 데이터 저장
     total_df.to_csv(csv_output_path)
 
+
+
     ##임계값 로드 및 탐지 결과 생성 과정 (결과 status 대상 파일을 저장, status history 저장(파괴 및 생성), 개개별 파일에 history 생성 및 추가)
     #유저파일 정보 로드
-    user_file_list, threshold_list = load_userfile_info(user_folder)
+    user_folder_list, threshold_list = load_userfile_info(user_folder)
 
     #이상치 탐지 및 이상치 결과 저장
-    result_df = detection(total_df, threshold_list, output_path)
+    result_df = detection(total_df, threshold_list, output_path, current_date)
 
     #개별 유저 파일에 히스토리 추가 / 생성
-    append_user_history(total_df, user_folder, user_file_list)
+    append_to_csv(total_df, user_folder)
 
+    """
     #test 데이터 train으로 이동
     move_files(test_data_source, train_data_destination)
+    """
