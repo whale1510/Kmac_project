@@ -1,1 +1,8 @@
 venv\
+Train\Gyro_train_data\*
+Train\Json2csv\*
+User\*
+Output\Day\*
+Output\History\*
+Test\Gyro_train_data\*
+Test\Json2csv\*
