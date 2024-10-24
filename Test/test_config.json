@@ -1,6 +1,7 @@
 {
 	"input_json_file_path": {
-		"Gyro_test_data" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/Test/Gyro_test_data/"
+		"Gyro_test_data" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/Test/Gyro_test_data/",
+		"Gyro_train_data" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/Train/Gyro_train_data/"
 	},
 	"json_to_csv_path" : {
 		"csv_file" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/Test/Json2csv/"	
@@ -9,6 +10,7 @@
 		"user_file" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/User/"
 	},
 	"output_path" : {
-		"output_result" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/Output/Day/"
+		"day_output_result" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/Output/Day/",
+		"history_output_result" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/Output/History/"
 	}
 }

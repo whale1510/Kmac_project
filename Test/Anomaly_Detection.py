@@ -82,17 +82,33 @@ def load_userfile_info(user_folder):
 
     return folder_list, threshold_list
 
-def move_files(source, destination):
-    for filename in os.listdir(source):
+def move_files(source, destination, normal_user_ids):
+    ##임시로 통합하도록 작성해놓음##
+    source_file = os.path.join(source, "raw_data.json")
+    destination_file = os.path.join(destination, "raw_data.json")
+    with open(source_file, 'r') as f:
+        source_data = json.load(f)
+    with open(destination_file, 'r') as f:
+        destination_data = json.load(f)
+    for entry in source_data:
+        if str(entry["user"]) in normal_user_ids:
+            destination_data.append(entry)
+
+
+    with open(destination_file, 'w') as f:
+        json.dump(destination_data, f, indent=4)
+
+    """
+    for filename in normal_user_ids:
         file_path = os.path.join(source, str(filename))
         if os.path.isfile(file_path):
             # 파일을 이동하고 대상에 같은 이름의 파일이 있으면 덮어씁니다
             shutil.move(file_path, os.path.join(destination, str(filename)))
-
+    """
 
 
 #이상탐지 함수
-def detection(df, threshold_list, output_path, current_date):
+def detection_and_savefile(df, threshold_list, day_output_path, history_output_path, current_date):
     normal_group = []
     outlier_group = []
     total_group = []
@@ -113,13 +129,29 @@ def detection(df, threshold_list, output_path, current_date):
     }
 
     filename = f"result_{current_date}.json"
-    file_path = os.path.join(output_path, filename)
+    file_path = os.path.join(day_output_path, filename)
 
     # JSON 파일에 쓰기
     with open(file_path, 'w') as json_file:
         json.dump(results, json_file, indent=4)
+
+    #히스토리파일 생성 및 추가하기
+    for entry in total_group:
+        entry["time"] = current_date
+    
+    total_df = pd.DataFrame(total_group)
+    history_file = os.path.join(history_output_path, 'alarm_history.csv')
+
+    if os.path.exists(history_file):
+        total_df.to_csv(history_file, mode='a', header=False, index=False)
+    else:
+        total_df.to_csv(history_file, mode='w', header=True, index=False)
+
+    #정상 그룹 파일명만 추출
+    normal_user_ids = [entry["user_id"] for entry in normal_group]
+    return normal_user_ids
  
-    #히스토리 추가하고, 날짜별 분류 가능하게 변경할 예정
+    #날짜별 분류 가능하게 변경할 예정
     
     
 def append_to_csv(df, user_folder):
@@ -155,7 +187,9 @@ if __name__ == "__main__":
         config = json.load(config_file)
 
     # 폴더 위치를 가져옵니다.
-    Gyro_train_folder_path = config['input_json_file_path']["Gyro_test_data"] 
+    Gyro_test_folder_path = config['input_json_file_path']["Gyro_test_data"]
+    Gyro_train_folder_path = config['input_json_file_path']["Gyro_train_data"] 
+ 
 
     #통합 데이터 1차 저장경로
     total_filename = "Test_Total.csv"
@@ -165,20 +199,14 @@ if __name__ == "__main__":
     user_folder = config['user_file_path']['user_file']
 
     #결과 저장 경로
-    output_path = config['output_path']['output_result']
-
-    """
-    #파일 이동 경로
-    test_data_source = config['device_meter_folder_path']['device_test_path']
-    train_data_destination =  config['device_meter_folder_path']['meter_train_path']
-    """
-
+    day_output_path = config['output_path']['day_output_result']
+    history_output_path = config['output_path']['history_output_result']
 
     ##전처리 과정
     #날짜별로 통합(데이터셋에 따라 맞춰서 구축)
     pass
 
-    merged_df = json2csv(Gyro_train_folder_path)
+    merged_df = json2csv(Gyro_test_folder_path)
 
     #통합 데이터 전처리
     total_df = preprocessing(merged_df)
@@ -193,12 +221,10 @@ if __name__ == "__main__":
     user_folder_list, threshold_list = load_userfile_info(user_folder)
 
     #이상치 탐지 및 이상치 결과 저장
-    result_df = detection(total_df, threshold_list, output_path, current_date)
+    normal_user_ids = detection_and_savefile(total_df, threshold_list, day_output_path, history_output_path, current_date)
 
     #개별 유저 파일에 히스토리 추가 / 생성
     append_to_csv(total_df, user_folder)
 
-    """
     #test 데이터 train으로 이동
-    move_files(test_data_source, train_data_destination)
-    """
+    move_files(Gyro_test_folder_path, Gyro_train_folder_path, normal_user_ids)
