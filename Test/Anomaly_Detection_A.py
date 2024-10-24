@@ -90,6 +90,7 @@ def move_files(source, destination, normal_user_ids):
         source_data = json.load(f)
     with open(destination_file, 'r') as f:
         destination_data = json.load(f)
+    print(len(destination_data))
     for entry in source_data:
         if str(entry["user"]) in normal_user_ids:
             destination_data.append(entry)
@@ -97,6 +98,7 @@ def move_files(source, destination, normal_user_ids):
 
     with open(destination_file, 'w') as f:
         json.dump(destination_data, f, indent=4)
+    print(len(destination_data))
 
     """
     for filename in normal_user_ids:
@@ -113,15 +115,30 @@ def detection_and_savefile(df, threshold_list, day_output_path, history_output_p
     outlier_group = []
     total_group = []
     
+    status_history_file = os.path.join(history_output_path, 'status_history.csv')
+    status_df = pd.read_csv(status_history_file)
+
     for user, group in df.groupby('user'):
         threshold = threshold_list.get(user)
         total_sum = group[['x','y','z']].abs().sum().sum()
-        if total_sum < 3.0 :
-            outlier_group.append({"user_id" : f'{user}', "status" : "1"})
-            total_group.append({"user_id" : f'{user}', "status" : "1"})
-        else :
-            normal_group.append({"user_id" : f'{user}', "status" : "0"})
+        if total_sum < 3.0:
+            status_df.loc[status_df['user_id'] == user, 'status'] += 1
+        else:
+            status_df.loc[status_df['user_id'] == user, 'status'] *= 0
+
+        if (status_df.loc[status_df['user_id'] == user, 'status'] == 0).any():
             total_group.append({"user_id" : f'{user}', "status" : "0"})
+        elif (status_df.loc[status_df['user_id'] == user, 'status'] == 1).any():
+            total_group.append({"user_id" : f'{user}', "status" : "1"})
+        elif (status_df.loc[status_df['user_id'] == user, 'status'] == 2).any():
+            total_group.append({"user_id" : f'{user}', "status" : "2"})
+        elif (status_df.loc[status_df['user_id'] == user, 'status'] == 3).any():
+            total_group.append({"user_id" : f'{user}', "status" : "3"})
+        else :
+            total_group.append({"user_id" : f'{user}', "status" : "4"})
+
+    # JSON 파일에 덮어쓰기
+    status_df.to_csv(status_history_file, index=False)
 
     results = {
         "date" : current_date,
