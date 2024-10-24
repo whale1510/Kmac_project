@@ -1,0 +1,11 @@
+{
+	"input_json_file_path": {
+		"Gyro_train_data" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/Train/Gyro_train_data/"
+	},
+	"json_to_csv_path" : {
+		"csv_file" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/Train/Json2csv/"	
+	},
+	"user_file_path" : {
+		"user_file" : "C:/Users/KMAC/Desktop/조병웅/Project/자이로/gyro/User/"
+	}
+}
